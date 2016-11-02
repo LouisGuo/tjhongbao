@@ -12,6 +12,10 @@ using Senparc.Weixin.MP.Entities;
 using Senparc.Weixin.MP.Entities.Request;
 using Senparc.Weixin.MP.MessageHandlers;
 using Senparc.Weixin.MP.Helpers;
+using Senparc.Weixin.MP.Containers;
+using Senparc.Weixin.MP.Entities.Menu;
+using Senparc.Weixin.MP.CommonAPIs;
+using Senparc.Weixin.MP;
 
 namespace WebApplication4
 {
@@ -246,6 +250,14 @@ namespace WebApplication4
                     DateTime.Now.Ticks);
                 return faultTolerantResponseMessage;
             }
+            else if (requestMessage.Content == "reset menu")
+            {
+                var faultTolerantResponseMessage = requestMessage.CreateResponseMessage<ResponseMessageText>();
+
+                ResetMenu();
+                faultTolerantResponseMessage.Content = "重置成功";
+                return faultTolerantResponseMessage;
+            }
             else
             {
                 var result = new StringBuilder();
@@ -280,6 +292,52 @@ namespace WebApplication4
             return responseMessage;
         }
 
+        private void ResetMenu()
+        {
+            var accessToken = AccessTokenContainer.GetAccessToken(appId, true);
+            var result = CommonApi.GetMenu(accessToken);
+            var deleteResult = CommonApi.DeleteMenu(accessToken);
+
+            ButtonGroup bg = new ButtonGroup();
+
+            //单击
+            bg.button.Add(new SingleClickButton()
+            {
+                name = "单击测试",
+                key = "OneClick",
+                type = ButtonType.click.ToString(),//默认已经设为此类型，这里只作为演示
+            });
+
+            //二级菜单
+            var subButton = new SubButton()
+            {
+                name = "二级菜单"
+            };
+            subButton.sub_button.Add(new SingleClickButton()
+            {
+                key = "SubClickRoot_Text",
+                name = "返回文本"
+            });
+            subButton.sub_button.Add(new SingleClickButton()
+            {
+                key = "SubClickRoot_News",
+                name = "返回图文"
+            });
+            subButton.sub_button.Add(new SingleClickButton()
+            {
+                key = "SubClickRoot_Music",
+                name = "返回音乐"
+            });
+            subButton.sub_button.Add(new SingleViewButton()
+            {
+                url = "http://weixin.senparc.com",
+                name = "Url跳转"
+            });
+            bg.button.Add(subButton);
+            var addResult = CommonApi.CreateMenu(accessToken, bg);
+
+        }
+
         public override IResponseMessageBase OnShortVideoRequest(RequestMessageShortVideo requestMessage)
         {
             var responseMessage = this.CreateResponseMessage<ResponseMessageText>();
@@ -312,7 +370,7 @@ namespace WebApplication4
 
             return responseMessage;
         }
-        
+
         /// <summary>
         /// 处理视频请求
         /// </summary>
