@@ -131,7 +131,8 @@ namespace WebApplication4.Controllers
                         tw.WriteLine(ex.InnerException.Source);
                         tw.WriteLine(ex.InnerException.StackTrace);
                     }
-                    return new FixWeixinBugWeixinResult(ex.ToString());
+                    messageHandler.TextResponseMessage = ex.ToString();
+                    return new FixWeixinBugWeixinResult(messageHandler);
                 }
             }
         }

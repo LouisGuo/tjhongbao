@@ -128,7 +128,7 @@ namespace WebApplication4
             //    ResponseMessageText;
 
             //方法二（v0.4）
-            //var responseMessage = ResponseMessageBase.CreateFromRequestMessage<ResponseMessageText>(RequestMessage);
+            //var responseMessage1 = ResponseMessageBase.CreateFromRequestMessage<ResponseMessageText>(RequestMessage);
 
             //方法三（v0.4），扩展方法，需要using Senparc.Weixin.MP.Helpers;
             //var responseMessage = RequestMessage.CreateResponseMessage<ResponseMessageText>();
@@ -142,114 +142,6 @@ namespace WebApplication4
             {
 
             }
-            else if (requestMessage.Content == "约束")
-            {
-                responseMessage.Content =
-                    @"您正在进行微信内置浏览器约束判断测试。您可以：
-<a href=""http://sdk.weixin.senparc.com/FilterTest/"">点击这里</a>进行客户端约束测试（地址：http://sdk.weixin.senparc.com/FilterTest/），如果在微信外打开将直接返回文字。
-或：
-<a href=""http://sdk.weixin.senparc.com/FilterTest/Redirect"">点击这里</a>进行客户端约束测试（地址：http://sdk.weixin.senparc.com/FilterTest/Redirect），如果在微信外打开将重定向一次URL。";
-            }
-            else if (requestMessage.Content == "托管" || requestMessage.Content == "代理")
-            {
-                //开始用代理托管，把请求转到其他服务器上去，然后拿回结果
-                //甚至也可以将所有请求在DefaultResponseMessage()中托管到外部。
-
-                DateTime dt1 = DateTime.Now; //计时开始
-
-                var responseXml = MessageAgent.RequestXml(this, agentUrl, agentToken, RequestDocument.ToString());
-                //获取返回的XML
-                //上面的方法也可以使用扩展方法：this.RequestResponseMessage(this,agentUrl, agentToken, RequestDocument.ToString());
-
-                /* 如果有WeiweihiKey，可以直接使用下面的这个MessageAgent.RequestWeiweihiXml()方法。
-                 * WeiweihiKey专门用于对接www.weiweihi.com平台，获取方式见：http://www.weiweihi.com/ApiDocuments/Item/25#51
-                 */
-                //var responseXml = MessageAgent.RequestWeiweihiXml(weiweihiKey, RequestDocument.ToString());//获取Weiweihi返回的XML
-
-                DateTime dt2 = DateTime.Now; //计时结束
-
-                //转成实体。
-                /* 如果要写成一行，可以直接用：
-                 * responseMessage = MessageAgent.RequestResponseMessage(agentUrl, agentToken, RequestDocument.ToString());
-                 * 或
-                 *
-                 */
-                var msg = string.Format("\r\n\r\n代理过程总耗时：{0}毫秒", (dt2 - dt1).Milliseconds);
-                var agentResponseMessage = responseXml.CreateResponseMessage();
-                if (agentResponseMessage is ResponseMessageText)
-                {
-                    (agentResponseMessage as ResponseMessageText).Content += msg;
-                }
-                else if (agentResponseMessage is ResponseMessageNews)
-                {
-                    (agentResponseMessage as ResponseMessageNews).Articles[0].Description += msg;
-                }
-                return agentResponseMessage;//可能出现多种类型，直接在这里返回
-            }
-            else if (requestMessage.Content == "测试" || requestMessage.Content == "退出")
-            {
-                /*
-                * 这是一个特殊的过程，此请求通常来自于微微嗨（http://www.weiweihi.com）的“盛派网络小助手”应用请求（http://www.weiweihi.com/User/App/Detail/1），
-                * 用于演示微微嗨应用商店的处理过程，由于微微嗨的应用内部可以单独设置对话过期时间，所以这里通常不需要考虑对话状态，只要做最简单的响应。
-                */
-                if (requestMessage.Content == "测试")
-                {
-                    //进入APP测试
-                    responseMessage.Content = "您已经进入【盛派网络小助手】的测试程序，请发送任意信息进行测试。发送文字【退出】退出测试对话。10分钟内无任何交互将自动退出应用对话状态。";
-                }
-                else
-                {
-                    //退出APP测试
-                    responseMessage.Content = "您已经退出【盛派网络小助手】的测试程序。";
-                }
-            }
-            else if (requestMessage.Content == "AsyncTest")
-            {
-                //异步并发测试（提供给单元测试使用）
-                DateTime begin = DateTime.Now;
-                int t1, t2, t3;
-                System.Threading.ThreadPool.GetAvailableThreads(out t1, out t3);
-                System.Threading.ThreadPool.GetMaxThreads(out t2, out t3);
-                System.Threading.Thread.Sleep(TimeSpan.FromSeconds(4));
-                DateTime end = DateTime.Now;
-                var thread = System.Threading.Thread.CurrentThread;
-                responseMessage.Content = string.Format("TId:{0}\tApp:{1}\tBegin:{2:mm:ss,ffff}\tEnd:{3:mm:ss,ffff}\tTPool：{4}",
-                        thread.ManagedThreadId,
-                        HttpContext.Current != null ? HttpContext.Current.ApplicationInstance.GetHashCode() : -1,
-                        begin,
-                        end,
-                        t2 - t1
-                        );
-            }
-            else if (requestMessage.Content == "open")
-            {
-                var openResponseMessage = requestMessage.CreateResponseMessage<ResponseMessageNews>();
-                openResponseMessage.Articles.Add(new Article()
-                {
-                    Title = "开放平台微信授权测试",
-                    Description = @"点击进入Open授权页面。
-
-授权之后，您的微信所收到的消息将转发到第三方（盛派网络小助手）的服务器上，并获得对应的回复。
-
-测试完成后，您可以登陆公众号后台取消授权。",
-                    Url = "http://sdk.weixin.senparc.com/OpenOAuth/JumpToMpOAuth"
-                });
-                return openResponseMessage;
-            }
-            else if (requestMessage.Content == "错误")
-            {
-                var errorResponseMessage = requestMessage.CreateResponseMessage<ResponseMessageText>();
-                //因为没有设置errorResponseMessage.Content，所以这小消息将无法正确返回。
-                return errorResponseMessage;
-            }
-            else if (requestMessage.Content == "容错")
-            {
-                Thread.Sleep(1500);//故意延时1.5秒，让微信多次发送消息过来，观察返回结果
-                var faultTolerantResponseMessage = requestMessage.CreateResponseMessage<ResponseMessageText>();
-                faultTolerantResponseMessage.Content = string.Format("测试容错，MsgId：{0}，Ticks：{1}", requestMessage.MsgId,
-                    DateTime.Now.Ticks);
-                return faultTolerantResponseMessage;
-            }
             else if (requestMessage.Content == "reset menu")
             {
                 var faultTolerantResponseMessage = requestMessage.CreateResponseMessage<ResponseMessageText>();
@@ -258,36 +150,105 @@ namespace WebApplication4
                 faultTolerantResponseMessage.Content = "重置成功";
                 return faultTolerantResponseMessage;
             }
+            else if (requestMessage.Content.Contains("https://h.ele.me/hongbao"))
+            {
+                var url = requestMessage.Content;
+                var faultTolerantResponseMessage = requestMessage.CreateResponseMessage<ResponseMessageText>();
+                var hongbaoUrlService = new HongBaoUrlService();
+                var isUrlExists = hongbaoUrlService.GetByUrl(url) != null;
+                if (isUrlExists)
+                {
+                    faultTolerantResponseMessage.Content = "该红包已存在，请选择其他红包上传";
+                }
+                else
+                {
+                    var hongbaoUrlEntity = new HongBaoUrlEntity
+                    {
+                        Id = Guid.NewGuid(),
+                        CreateTime = DateTime.Now,
+                        PlateformType = PlateformType.Eleme,
+                        UsedTimes = 0,
+                        CreatorId = requestMessage.FromUserName,
+                        Url = url,
+                        OrigionUrl = requestMessage.Content
+                    };
+                    hongbaoUrlService.Add(hongbaoUrlEntity);
+                    faultTolerantResponseMessage.Content = "save成功";
+                }
+                return faultTolerantResponseMessage;
+            }
+            else if (requestMessage.Content.Contains("http://activity.waimai.meituan.com/coupon/channel"))
+            {
+                var url = requestMessage.Content.
+                    Substring(requestMessage.Content.IndexOf("http://activity.waimai.meituan.com/coupon/channel"),
+                    122); ;
+                var faultTolerantResponseMessage = requestMessage.CreateResponseMessage<ResponseMessageText>();
+                var hongbaoUrlService = new HongBaoUrlService();
+                var isUrlExists = hongbaoUrlService.GetByUrl(url) != null;
+                if (isUrlExists)
+                {
+                    faultTolerantResponseMessage.Content = "该红包已存在，请选择其他红包上传";
+                }
+                else
+                {
+                    var hongbaoUrlEntity = new HongBaoUrlEntity
+                    {
+                        Id = Guid.NewGuid(),
+                        CreateTime = DateTime.Now,
+                        PlateformType = PlateformType.MeiTuan,
+                        UsedTimes = 0,
+                        CreatorId = requestMessage.FromUserName,
+                        Url = url,
+                        OrigionUrl = requestMessage.Content
+                    };
+                    hongbaoUrlService.Add(hongbaoUrlEntity);
+                    faultTolerantResponseMessage.Content = "save成功";
+                }
+                return faultTolerantResponseMessage;
+            }
+            else if (requestMessage.Content == "meituan"
+                || requestMessage.Content == "eleme"
+                || requestMessage.Content == "baidu")
+            {
+                var plateformType = PlateformType.MeiTuan;
+                switch (requestMessage.Content)
+                {
+                    case "meituan":
+                        plateformType = PlateformType.MeiTuan;
+                        break;
+                    case "eleme":
+                        plateformType = PlateformType.Eleme;
+                        break;
+                    case "baidu":
+                        plateformType = PlateformType.Baidu;
+                        break;
+                    default:
+                        plateformType = PlateformType.MeiTuan;
+                        break;
+                }
+                var faultTolerantResponseMessage = requestMessage.CreateResponseMessage<ResponseMessageText>();
+                var hongbaoUrlService = new HongBaoUrlService();
+                var hongbaoUrlEntity = hongbaoUrlService.GetByUserId(requestMessage.FromUserName, plateformType);
+                if (hongbaoUrlEntity == null)
+                {
+                    faultTolerantResponseMessage.Content = @"无可用红包 \r\n
+（你可以把外卖红包的连接地址直接发送给我们以扩大我们的红包仓库）";
+                }
+                else
+                {
+                    faultTolerantResponseMessage.Content = plateformType + "红包:  " + hongbaoUrlEntity.Url;
+                }
+                return faultTolerantResponseMessage;
+            }
             else
             {
-                var result = new StringBuilder();
-                result.AppendFormat("您刚才发送了文字信息：{0}\r\n\r\n", requestMessage.Content);
 
-                if (CurrentMessageContext.RequestMessages.Count > 1)
-                {
-                    result.AppendFormat("您刚才还发送了如下消息（{0}/{1}）：\r\n", CurrentMessageContext.RequestMessages.Count,
-                        CurrentMessageContext.StorageData);
-                    for (int i = CurrentMessageContext.RequestMessages.Count - 2; i >= 0; i--)
-                    {
-                        var historyMessage = CurrentMessageContext.RequestMessages[i];
-                        result.AppendFormat("{0} 【{1}】{2}\r\n",
-                            historyMessage.CreateTime.ToShortTimeString(),
-                            historyMessage.MsgType.ToString(),
-                            (historyMessage is RequestMessageText)
-                                ? (historyMessage as RequestMessageText).Content
-                                : "[非文字类型]"
-                            );
-                    }
-                    result.AppendLine("\r\n");
-                }
+                responseMessage.Content = @"获取外卖红包连接 方法： \r\n
+1. 在输入框发送meituan获取美团外卖红包 \r\n
+2. 在输入框发送eleme获取饿了么外卖红包 \r\n
+3. 在输入框发送baidu获取百度外卖红包 \r\n\r\n
 
-                result.AppendFormat("如果您在{0}分钟内连续发送消息，记录将被自动保留（当前设置：最多记录{1}条）。过期后记录将会自动清除。\r\n",
-                    WeixinContext.ExpireMinutes, WeixinContext.MaxRecordCount);
-                result.AppendLine("\r\n");
-                result.AppendLine(
-                    "您还可以发送【位置】【图片】【语音】【视频】等类型的信息（注意是这几种类型，不是这几个文字），查看不同格式的回复。\r\nSDK官方地址：http://sdk.weixin.senparc.com");
-
-                responseMessage.Content = result.ToString();
+（你也可以把外卖红包的连接地址直接发送给我们以扩大我们的红包仓库）";
             }
             return responseMessage;
         }
@@ -420,7 +381,12 @@ Url:{2}", requestMessage.Title, requestMessage.Description, requestMessage.Url);
             */
 
             var responseMessage = this.CreateResponseMessage<ResponseMessageText>();
-            responseMessage.Content = "这条消息来自DefaultResponseMessage。";
+            responseMessage.Content = @"获取外卖红包连接 方法： \r\n
+1. 在输入框发送meituan获取美团外卖红包 \r\n
+2. 在输入框发送eleme获取饿了么外卖红包 \r\n
+3. 在输入框发送baidu获取百度外卖红包 \r\n\r\n
+
+（你也可以把外卖红包的连接地址直接发送给我们以扩大我们的红包仓库）";
             return responseMessage;
         }
     }
